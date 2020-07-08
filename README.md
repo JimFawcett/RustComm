@@ -2,6 +2,8 @@
 
 https://JimFawcett.github.io/RustComm.html
 
+rust_comm::lib.rs Facilities:
+-----------------------------
 Prototype for message-passing communication system
 Provides two user defined types: Sender and Receiver. 
  - Uses unbuffered, unqueued full-duplex message sending and 
