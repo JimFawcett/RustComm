@@ -28,6 +28,7 @@
    - Convert to buffered reads and writes
    - Add user-defined Comm type that composes a Sender and a
      Receiver.  
+   - Provide mechanism to shut down Receiver gracefully
    - Support interhangeably Messages that use references to
      external facilities for defining message body contents
      rather than packing into message. 
@@ -35,7 +36,6 @@
 #![allow(dead_code)]
 
 use std::fmt::*;
-// use std::thread::*;
 
 /*-------------------------------------------------------------
   Message Class
@@ -201,57 +201,26 @@ impl Receiver {
         print!("\n  -- starting Receiver --");
         for stream in self.tcpl.incoming() {
             // print!("\n  -- entered incoming loop --");
-            let rslt = handle_client(&mut stream?);
-            match rslt {
-                Ok(_) => {
-                    print!("\n---- handle_client io exit --");
-                },
-                Err(_error) => { 
-                    print!("\n  -- terminating: END message --");
-                    break 
-                },
-            }
+            let _handle = std::thread::spawn(move || {
+                let rslt = handle_client(&mut stream.unwrap());
+                match rslt {
+                    Ok(_) => {
+                        print!("\n---- handle_client io exit --");
+                        let _ = std::io::stdout().flush();
+                        return;
+                    },
+                    Err(_error) => { 
+                        print!("\n  -- terminating: END message --");
+                        let _ = std::io::stdout().flush();
+                        return; 
+                    },
+                }    
+            });
         }
         Ok(())
     }
 }
-// /*---------------------------------------------------------
-//   External function that defines client processing 
-//   for each Receiver connection.
-// */
-// #[allow(unreachable_code)]
-// pub fn handle_client(stream: &std::net::TcpStream) -> std::io::Result<()> {
-//     // print!("\n  -- entered handle_client --");
-//     let mut reader = std::io::BufReader::new(stream.try_clone()?);
-//     loop {
-//         let mut msg = Message::new();
-//         /*-- get MessageType --*/
-//         let buf = &mut [0u8; 1];
-//         reader.read_exact(buf)?;
-//         let msgtype = buf[0];
-//         msg.set_type(msgtype);
-//         /*-- get body size --*/
-//         let buf = &mut [0u8; 4];
-//         reader.read_exact(buf)?;
-//         let bdysz = usize::from_ne_bytes(*buf);
-//         /*-- get body bytes --*/
-//         let mut bdy = vec![0u8;bdysz];
-//         reader.read_exact(&mut bdy)?;
-//         msg.set_body_bytes(bdy);
-//         print!("\n  -- received message --");
-//         // show_msg(&msg);
-//         if msg.get_body_size() > 0 {
-//             show_body_str(&msg);
-//             // show_body(&msg);
-//         }
-//         if msg.get_type().get_type() == MessageType::END {
-//             // print!("\n  -- returning from handle client END message --");
-//             let error = std::io::Error::new(ErrorKind::Other, "END");
-//             return Err(error);
-//         }
-//     }
-//     assert_eq!(1,2);  // should never get here
-// }
+/*-- implement Receiver associated functions --*/
 impl Receiver {
     /*-- creates and starts Receiver listening on addr --*/
     fn do_rcv(addr: &str) {

@@ -57,6 +57,25 @@ fn test_message() {
     show_msg(&msg);
     show_body(&msg);
 }
+/*-- start client sending messages on dedicated thread --*/
+fn start_client(addr:&'static str, name:&'static str, n:u32) {
+  let _handle = std::thread::spawn(move || {
+    let mut sndr = Sender::new();
+    Receiver::check_connection(&sndr.connect(addr));
+  
+    for i in 0..n {
+        let mut msg = Message::new();
+        // msg.set_name("bugs");
+        let bstr = format!("msg #{} from client {}", i, name);
+        msg.set_body_str(&bstr);
+        Receiver::check_io(&sndr.send_message(msg));
+    }
+    /*-- send END message --*/
+    let mut msg = Message::new();
+    msg.set_type(MessageType::END);
+    Receiver::check_io(&sndr.send_message(msg));
+    });
+}
 
 fn test_comm() {
 
@@ -66,25 +85,16 @@ fn test_comm() {
     let addr = "127.0.0.1:8081";
     let handle = Receiver::start_listener(addr);
 
-    let mut sndr = Sender::new();
-    Receiver::check_connection(&sndr.connect(addr));
+    start_client(addr, "bugs", 5);
+    start_client(addr, "elmer", 5);
+    start_client(addr, "daffy", 5);
 
-    for i in 0..5 {
-        let mut msg = Message::new();
-        let bstr = format!("msg #{} from client", i);
-        msg.set_body_str(&bstr);
-        Receiver::check_io(&sndr.send_message(msg));
-    }
-    /*-- send END message --*/
-    let mut msg = Message::new();
-    msg.set_type(MessageType::END);
-    Receiver::check_io(&sndr.send_message(msg));
     let _ = handle.join();
 }
 fn main() {
 
-    test_message();
-    println!();
+    // test_message();
+    // println!();
     test_comm();
 
     print!("\n\n  That's all Folks!\n\n");
