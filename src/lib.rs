@@ -11,8 +11,7 @@
    rust_comm::lib.rs Facilities:
   -------------------------------
    Provides two user defined types: Sender and Receiver. 
-   - Uses unbuffered, unqueued full-duplex message sending and 
-     receiving
+   - Uses unqueued full-duplex message sending and receiving
    - Each message has a fixed size header and Vec<u8> body.
    - For each Sender connection, Receiver processes messages
      until receiving a message with MessageType::END.
@@ -36,7 +35,38 @@
 #![allow(dead_code)]
 
 use std::fmt::*;
+// use std::time::{Duration};
 
+pub trait Log {
+    fn write(msg: &str);
+    fn default() -> Self;
+}
+pub struct MuteLog;
+impl Log for MuteLog {
+    fn write(_msg: &str) {}
+    fn default() -> MuteLog {
+        MuteLog {}
+    }
+}
+impl MuteLog {
+    pub fn new() -> MuteLog {
+        MuteLog {}
+    }
+}
+pub struct VerboseLog;
+impl Log for VerboseLog {
+    fn write(msg: &str) {
+        print!("{}", msg);
+    }
+    fn default() -> VerboseLog {
+        VerboseLog {}
+    }
+}
+impl VerboseLog {
+    pub fn new() -> VerboseLog {
+        VerboseLog {}
+    }
+}
 /*-------------------------------------------------------------
   Message Class
 */
@@ -48,6 +78,7 @@ impl MessageType {
     pub const TEXT:u8 = 1;
     pub const BYTES:u8 = 2;
     pub const END:u8 = 4;
+    pub const QUIT:u8 = 8;
 
     pub fn get_type(&self) -> u8 {
         self.msgtype
@@ -55,7 +86,8 @@ impl MessageType {
     pub fn set_type(&mut self, mt:u8) {
         if (mt == MessageType::TEXT) | 
            (mt == MessageType::BYTES) | 
-           (mt == MessageType::END) {
+           (mt == MessageType::END) |
+           (mt == MessageType::QUIT) {
             self.msgtype = mt;
         }
     }
@@ -148,103 +180,182 @@ pub fn show_body_str(msg: &Message) {
 /*-------------------------------------------------------------
   Sender - Message-passing Comm
 */
-use std::io::{Read, Write, ErrorKind};
+use std::io::{Read, Write, Error, ErrorKind, BufReader, BufWriter};
+use std::net::{TcpStream};
 
 #[derive(Debug)]
-pub struct Sender {
+pub struct Sender<L> where L: Log {
     //buf_stream: std::io::BufWriter<std::net::TcpStream>
-    stream_opt: std::option::Option<std::net::TcpStream>,
+    stream_opt: std::option::Option<TcpStream>,
+    // stream_opt: std::option::Option<std::net::TcpStream>,
+    log: L,
 }
-impl Sender {
-    pub fn new() -> Sender {
-        Sender {
+impl<L> Sender<L> where L:Log {
+    pub fn new() -> Sender<L> {
+        Sender::<L> {
             stream_opt: None,
+            log: L::default(), 
         }
     }
     pub fn connect(&mut self, addr: &str) -> std::io::Result<()> {
-        self.stream_opt = Some(std::net::TcpStream::connect(addr)?);
+        self.stream_opt = Some(TcpStream::connect(addr)?);
         // print!("\n  -- leaving Sndr::connect --");
         Ok(())
     }
     pub fn send_message(&mut self, msg:Message) -> std::io::Result<()> {
-        // print!("\n  -- entered send_message --");
         let rslt = &self.stream_opt;
-        let mut stream : &std::net::TcpStream;
+        let stream: &TcpStream;
         match rslt {
             Some(strm) => stream = strm,
             None => return Err(std::io::Error::new(ErrorKind::Other,"")),
         }
+        let mut buf_stream = BufWriter::new(stream);
         let typebyte = msg.get_type().get_type();
         let buf = [typebyte];
-        stream.write(&buf)?;
+        buf_stream.write(&buf)?;
         let bdysz = msg.get_body_size();
-        /*-- to_ne_bytes() converts integral type to byte array --*/
-        stream.write(&bdysz.to_ne_bytes())?;
-        stream.write(&msg.get_body())?;
-        print!("\n  -- send_message succeeded --");
+        /*-- to_be_bytes() converts integral type to big-endian byte array --*/
+        buf_stream.write(&bdysz.to_be_bytes())?;
+        buf_stream.write(&msg.get_body())?;
+        let _ = buf_stream.flush();
         Ok(())
+    }
+    pub fn recv_message(&mut self) -> std::io::Result<()> {
+        let rslt = &self.stream_opt;
+        let stream: &TcpStream;
+        match rslt {
+            Some(strm) => stream = strm,
+            None => return Err(std::io::Error::new(ErrorKind::Other,"")),
+        }
+        let mut buf_stream = BufReader::new(stream);
+        
+        let mut msg = Message::new();
+        /*-- get MessageType --*/
+        let buf = &mut [0u8; 1];
+        buf_stream.read_exact(buf)?;
+        let msgtype = buf[0];
+        msg.set_type(msgtype);
+        /*-- get body size --*/
+        let buf = &mut [0u8; 4];
+        buf_stream.read_exact(buf)?;
+        let bdysz = usize::from_be_bytes(*buf);
+        /*-- get body bytes --*/
+        let mut bdy = vec![0u8;bdysz];
+        buf_stream.read_exact(&mut bdy)?;
+        msg.set_body_bytes(bdy);
+        L::write("\n  -- Sender received reply message --");
+        // show_msg(&msg);
+        if msg.get_body_size() > 0 {
+            show_body_str(&msg);
+            // show_body(&msg);
+        }
+        Ok(())
+    }
+    /*-- factors out result processing for connections --*/
+    pub fn check_connection(rslt: &std::io::Result<()>) {
+        match rslt {
+            Ok(_) => L::write("\n  -- connection successful --"),
+            Err(_) => print!("\n---- connection failed ----"),
+        }
+    }
+    /*-- factors out result processing for io operations --*/
+    pub fn check_io(rslt: &std::io::Result<()>) {
+        match rslt {
+            Ok(_) => {},
+            Err(_) => print!("\n---- io failed ----"),
+        }
     }
 }
 /*---------------------------------------------------------
   Receiver - Message-passing Comm
 */
-pub struct Receiver {
-    tcpl: std::net::TcpListener,
+use std::sync::{Arc, atomic::AtomicBool, atomic::Ordering};
+
+#[derive(Debug)]
+pub struct Receiver<L> where L:Log + Send + 'static {
+    run: Arc<AtomicBool>,
+    listen_addr: String,
+    log: L,
 }
-impl Receiver {
-    pub fn new(addr: &str) -> Receiver {
+impl<L> Clone for Receiver<L> where L:Log + Send + 'static {
+    fn clone(&self) -> Receiver<L> {
         Receiver {
-            tcpl: std::net::TcpListener::bind(addr).unwrap(),
+            run : Arc::clone(&self.run),
+            listen_addr: self.listen_addr.clone(),
+            log: L::default(),
         }
     }
+}
+impl<L> Receiver<L> where L:Log + Send + 'static {
+    pub fn new(addr: &str) -> Receiver<L> {
+        Receiver {
+            run: Arc::new(AtomicBool::new(true)),
+            listen_addr: addr.to_string(),
+            log: L::default(),
+        }
+    }
+    pub fn stop(&mut self) {
+        self.run.store(false, Ordering::Relaxed);
+        L::write("\n  -- stopping Receiver --");
+    }
     pub fn start(&mut self) -> std::io::Result<()> {
-        print!("\n  -- starting Receiver --");
-        for stream in self.tcpl.incoming() {
-            // print!("\n  -- entered incoming loop --");
+        L::write("\n  -- starting Receiver --");
+        let tcpl = std::net::TcpListener::bind(&self.listen_addr)?;
+        for stream in tcpl.incoming() {
+            let run = self.run.load(Ordering::Relaxed);
+            if !run {
+                L::write("\n  -- breaking out of incoming loop --");
+                break;
+            }
             let _handle = std::thread::spawn(move || {
-                let rslt = handle_client(&mut stream.unwrap());
+                let rslt = handle_client::<L>(&mut stream.unwrap());
                 match rslt {
                     Ok(_) => {
-                        print!("\n---- handle_client io exit --");
                         let _ = std::io::stdout().flush();
                         return;
                     },
                     Err(_error) => { 
-                        print!("\n  -- terminating: END message --");
-                        let _ = std::io::stdout().flush();
-                        return; 
+                        if _error.to_string() == "END" {
+                            let _ = std::io::stdout().flush();
+                            return; 
+                        }
+                        else if _error.to_string() == "QUIT" {
+                            L::write("\n  -- terminating: QUIT message --");
+                            let _ = std::io::stdout().flush();
+                            return; 
+                        }
                     },
                 }    
             });
+            std::thread::yield_now();
         }
-        Ok(())
+        let error = Error::new(ErrorKind::Other, "QUIT");
+        Err(error)
     }
-}
-/*-- implement Receiver associated functions --*/
-impl Receiver {
     /*-- creates and starts Receiver listening on addr --*/
-    fn do_rcv(addr: &str) {
-        let mut rcvr = Receiver::new(addr);
-        let rslt = rcvr.start();
+    fn do_rcv(&mut self) {
+        let rslt = self.start();
         match rslt {
-            Ok(_) => {}, //print!("\n---- normal return from rcvr start ----"),
-            Err(_) => print!("\n----error return from rcvr start ----"),
+            Ok(_) => { 
+                /*print!("\n---- normal return from rcvr start ----"); */
+            },
+            Err(_) => { 
+                /*print!("\n----error return from rcvr start ----");*/ 
+            },
         }
     }
     /*-- starts listener running on a dedicated thread --*/
-    pub fn start_listener(addr: &'static str) -> std::thread::JoinHandle<()> {
+    pub fn start_listener(&mut self) -> std::thread::JoinHandle<()> {
+        let mut cln = self.clone();
         let handle = std::thread::spawn(move || {
-            Receiver::do_rcv(addr);
+            cln.do_rcv();
         });
         handle
     }
-    /*-- factors out result processing for connections --*/
-    pub fn check_connection(rslt: &std::io::Result<()>) {
-        match rslt {
-            Ok(_) => print!("\n  -- connection successful --"),
-            Err(_) => print!("\n---- connection failed ----"),
-        }
-    }
+}
+/*-- implement Receiver associated functions --*/
+impl<L> Receiver<L> where L:Log + Send {
+
     /*-- factors out result processing for io operations --*/
     pub fn check_io(rslt: &std::io::Result<()>) {
         match rslt {
@@ -258,8 +369,8 @@ impl Receiver {
   for each Receiver connection.
 */
 #[allow(unreachable_code)]
-pub fn handle_client(stream: &std::net::TcpStream) -> std::io::Result<()> {
-    // print!("\n  -- entered handle_client --");
+pub fn handle_client<L:Log> (stream: &std::net::TcpStream) -> std::io::Result<()> {
+
     let mut reader = std::io::BufReader::new(stream.try_clone()?);
     loop {
         let mut msg = Message::new();
@@ -271,24 +382,42 @@ pub fn handle_client(stream: &std::net::TcpStream) -> std::io::Result<()> {
         /*-- get body size --*/
         let buf = &mut [0u8; 4];
         reader.read_exact(buf)?;
-        let bdysz = usize::from_ne_bytes(*buf);
+        let bdysz = usize::from_be_bytes(*buf);
         /*-- get body bytes --*/
         let mut bdy = vec![0u8;bdysz];
         reader.read_exact(&mut bdy)?;
         msg.set_body_bytes(bdy);
-        print!("\n  -- received message --");
+        L::write("\n  -- Listener received message --");
         // show_msg(&msg);
         if msg.get_body_size() > 0 {
             show_body_str(&msg);
             // show_body(&msg);
         }
+        /*-- send echo reply --*/
+        send_message(stream, msg.clone())?;
         if msg.get_type().get_type() == MessageType::END {
-            // print!("\n  -- returning from handle client END message --");
             let error = std::io::Error::new(ErrorKind::Other, "END");
+            return Err(error);
+        }
+        if msg.get_type().get_type() == MessageType::QUIT {
+            let error = std::io::Error::new(ErrorKind::Other, "QUIT");
             return Err(error);
         }
     }
     assert_eq!(1,2);  // should never get here
+}
+pub fn send_message(stream: &std::net::TcpStream, msg:Message) 
+    -> std::io::Result<()> {
+    let mut buf_stream = BufWriter::new(stream);
+    let typebyte = msg.get_type().get_type();
+    let buf = [typebyte];
+    buf_stream.write(&buf)?;
+    let bdysz = msg.get_body_size();
+    /*-- to_be_bytes() converts integral type to big-endian byte array --*/
+    buf_stream.write(&bdysz.to_be_bytes())?;
+    buf_stream.write(&msg.get_body())?;
+    let _ = buf_stream.flush();
+    Ok(())
 }
 
 #[cfg(test)]

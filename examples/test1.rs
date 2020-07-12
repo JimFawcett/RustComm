@@ -11,28 +11,31 @@
 
    rust_comm::lib.rs Facilities:
   -------------------------------
-   Provides two user defined types: Sender and Receiver. 
-   - Uses unbuffered, unqueued full-duplex message sending and 
-     receiving
+   Provides three user defined types: Message, Sender & Receiver. 
+   - Uses unqueued full-duplex message sending and receiving
    - Each message has a fixed size header and Vec<u8> body.
    - For each Sender connection, Receiver processes messages
      until receiving a message with MessageType::END.
    - Receiver spawns a thread for each client connection and
      processes messages in an external handle_client function.
    - In this version, handle_client only displays message body
-     to console.  It does not send back a replay message.
+     to console.  It does not send back a reply message.
 
    Expected Changes and Additions:
   ---------------------------------
    - Add reply messages to this demo.
    - Add Sender queue and a threadpool in Receiver
-   - Convert to buffered reads and writes
    - Add user-defined Comm type that composes a Sender and a
      Receiver.   
 */
 #![allow(dead_code)]
 
 use rust_comm::*;
+use std::thread::{JoinHandle};
+use std::time::*;
+
+// type Log = MuteLog;  // shows only messages
+type Log = VerboseLog;  // shows messages and events
 
 fn test_message() {
 
@@ -58,23 +61,26 @@ fn test_message() {
     show_body(&msg);
 }
 /*-- start client sending messages on dedicated thread --*/
-fn start_client(addr:&'static str, name:&'static str, n:u32) {
+fn start_client(addr:&'static str, name:&'static str, n:u32) 
+   -> JoinHandle<()> {
+  
   let _handle = std::thread::spawn(move || {
-    let mut sndr = Sender::new();
-    Receiver::check_connection(&sndr.connect(addr));
+    let mut sndr = Sender::<Log>::new();
+    Sender::<Log>::check_connection(&sndr.connect(addr));
   
     for i in 0..n {
         let mut msg = Message::new();
-        // msg.set_name("bugs");
         let bstr = format!("msg #{} from client {}", i, name);
         msg.set_body_str(&bstr);
-        Receiver::check_io(&sndr.send_message(msg));
+        Sender::<Log>::check_io(&sndr.send_message(msg));
+        let _ = sndr.recv_message();
     }
     /*-- send END message --*/
     let mut msg = Message::new();
     msg.set_type(MessageType::END);
-    Receiver::check_io(&sndr.send_message(msg));
+    Receiver::<Log>::check_io(&sndr.send_message(msg));
     });
+    _handle
 }
 
 fn test_comm() {
@@ -83,12 +89,30 @@ fn test_comm() {
     println!();
 
     let addr = "127.0.0.1:8081";
-    let handle = Receiver::start_listener(addr);
+    let mut rcvr = Receiver::<Log>::new(addr);
+    let handle = rcvr.start_listener();
 
-    start_client(addr, "bugs", 5);
-    start_client(addr, "elmer", 5);
-    start_client(addr, "daffy", 5);
+    let handle1 = start_client(addr, "bugs", 5);
+    let handle2 = start_client(addr, "elmer", 5);
+    let handle3 = start_client(addr, "daffy", 5);
 
+    let _ = handle1.join();
+    let _ = handle2.join();
+    let _ = handle3.join();
+
+    let millisecs = Duration::from_millis(200);
+    std::thread::sleep(millisecs);
+    
+    rcvr.stop();
+    // print!("\n  called stop()");
+
+    let mut sndr = Sender::<Log>::new();
+    Sender::<Log>::check_connection(&sndr.connect(addr));
+    let mut msg = Message::new();
+    msg.set_type(MessageType::QUIT);
+    msg.set_body_str("Quit message");
+    Sender::<Log>::check_io(&sndr.send_message(msg.clone()));
+    
     let _ = handle.join();
 }
 fn main() {
