@@ -243,6 +243,10 @@ impl<L> Sender<L> where L:Log {
         let mut bdy = vec![0u8;bdysz];
         buf_stream.read_exact(&mut bdy)?;
         msg.set_body_bytes(bdy);
+        let mut mod_body = msg.get_body_str();
+        mod_body.push_str(" reply");
+        msg.clear();
+        msg.set_body_str(&mod_body);
         L::write("\n  -- Sender received reply message --");
         // show_msg(&msg);
         if msg.get_body_size() > 0 {
@@ -395,6 +399,7 @@ pub fn handle_client<L:Log> (stream: &std::net::TcpStream) -> std::io::Result<()
         }
         /*-- send echo reply --*/
         send_message(stream, msg.clone())?;
+
         if msg.get_type().get_type() == MessageType::END {
             let error = std::io::Error::new(ErrorKind::Other, "END");
             return Err(error);
@@ -412,6 +417,10 @@ pub fn send_message(stream: &std::net::TcpStream, msg:Message)
     let typebyte = msg.get_type().get_type();
     let buf = [typebyte];
     buf_stream.write(&buf)?;
+    // let mut body = msg.get_body_str();
+    // body.push_str(" reply");
+    // new_msg.clear();
+    // new_msg.set_body_str(&body);
     let bdysz = msg.get_body_size();
     /*-- to_be_bytes() converts integral type to big-endian byte array --*/
     buf_stream.write(&bdysz.to_be_bytes())?;

@@ -34,8 +34,8 @@ use rust_comm::*;
 use std::thread::{JoinHandle};
 use std::time::*;
 
-// type Log = MuteLog;  // shows only messages
-type Log = VerboseLog;  // shows messages and events
+type Log = MuteLog;  // shows only messages
+// type Log = VerboseLog;  // shows messages and events
 
 fn test_message() {
 
@@ -74,6 +74,7 @@ fn start_client(addr:&'static str, name:&'static str, n:u32)
         msg.set_body_str(&bstr);
         Sender::<Log>::check_io(&sndr.send_message(msg));
         let _ = sndr.recv_message();
+        std::thread::yield_now();
     }
     /*-- send END message --*/
     let mut msg = Message::new();
@@ -91,6 +92,9 @@ fn test_comm() {
     let addr = "127.0.0.1:8081";
     let mut rcvr = Receiver::<Log>::new(addr);
     let handle = rcvr.start_listener();
+
+    let millisecs = Duration::from_millis(100);
+    std::thread::sleep(millisecs);
 
     let handle1 = start_client(addr, "bugs", 5);
     let handle2 = start_client(addr, "elmer", 5);
