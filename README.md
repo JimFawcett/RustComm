@@ -6,4 +6,6 @@ Provides:
 - Message
 - CommProcessing&lt;L&gt;
 
+All application specific processing is in CommProcessing&lt;L&gt;.
+
 See https://JimFawcett.github.io/RustComm.html for details.
