@@ -1,0 +1,16 @@
+[package]
+name = "rust_comm_processing"
+version = "0.1.0"
+authors = ["James W. Fawcett <jfawcett@twcny.rr.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+doctest = false
+
+[dependencies]
+rust_traits = { path = "../rust_traits" }
+rust_message = { path = "../rust_message" }
+rust_blocking_queue = { path = "../rust_blocking_queue" }
+rust_comm_logger = { path = "../rust_comm_logger" }
