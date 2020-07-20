@@ -1,4 +1,15 @@
-// rust_message
+/////////////////////////////////////////////////////////////
+// rust_message - message type used to test rust_comm      //
+//                                                         //
+// Jim Fawcett, https://JimFawcett.github.io, 20 Jul 2020  //
+/////////////////////////////////////////////////////////////
+/*
+   Message:
+   - fixed size header holding a MessageType attribute:
+     TEXT, BYTES, END, QUIT, REPLY
+   - body holds utf-8 text or arbitrary byte sequence
+   - stores contents in std::Vec<u8>
+*/
 
 #![allow(dead_code)]
 
@@ -55,12 +66,7 @@ impl Default for Message {
     }
 }
 impl Msg for Message {
-    // fn new() -> &'static dyn Msg {
-    //     Message {
-    //         mt: MessageType { msgtype: 1, },
-    //         body_buffer: Vec::<u8>::new(),
-    //     }
-    // }
+
     fn set_type(&mut self, mt: u8) {
         self.mt = mt;
     }

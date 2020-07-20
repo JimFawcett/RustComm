@@ -1,4 +1,8 @@
-// rust_message::test1.rs
+/////////////////////////////////////////////////////////////
+// rust_message::test1.rs - demonstrate message type       //
+//                                                         //
+// Jim Fawcett, https://JimFawcett.github.io, 20 Jul 2020  //
+/////////////////////////////////////////////////////////////
 
 use rust_traits::*;
 use rust_message::*;

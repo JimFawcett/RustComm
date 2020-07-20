@@ -1,4 +1,8 @@
-// rust_comm_logger::lib.rs
+/////////////////////////////////////////////////////////////
+// rust_comm_logger::lib.rs - mechanism to show or hide    //
+//                                                         //
+// Jim Fawcett, https://JimFawcett.github.io, 20 Jul 2020  //
+/////////////////////////////////////////////////////////////
 
 use rust_traits::*;
 use std::fmt::*;

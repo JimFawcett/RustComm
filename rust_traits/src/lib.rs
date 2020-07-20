@@ -1,4 +1,17 @@
-// comm_traits.rs - traits module
+/////////////////////////////////////////////////////////////
+// comm_traits.rs - traits module                          //
+//                                                         //
+// Jim Fawcett, https://JimFawcett.github.com, 20 Jul 2020 //
+/////////////////////////////////////////////////////////////
+/*
+   Defines traits used for rust_comm:
+   - Logger
+   - MsgType
+   - Msg
+   - Sndr<M>
+   - Rcvr<M>
+   - Process<M>
+*/
 
 use std::net::{TcpStream};
 use std::io::{BufReader, BufWriter, Result};
