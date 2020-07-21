@@ -29,6 +29,7 @@ impl MessageType {
     pub const END:u8 = 4;
     pub const QUIT:u8 = 8;
     pub const REPLY:u8 = 16;
+    pub const SHUTDOWN:u8 = 32;
 
     pub fn _get_type(&self) -> u8 {
         self.msgtype

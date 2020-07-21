@@ -1,5 +1,5 @@
 /////////////////////////////////////////////////////////////
-// rust_comm::test1.rs - Test Tcp Communation Library      //
+// rust_comm::test2.rs - Test Tcp Communation Library      //
 //                                                         //
 // Jim Fawcett, https://JimFawcett.github.io, 19 Jul 2020  //
 /////////////////////////////////////////////////////////////
@@ -27,10 +27,21 @@ type Log = MuteLog;
 type M = Message;
 type P = CommProcessing<Log>;
 
-fn start_client(addr: &'static str, name: &'static str, n:usize) -> std::thread::JoinHandle<()> {
+fn start_client(
+       addr: &'static str, name: &'static str, n:usize, sd:bool
+   ) -> std::thread::JoinHandle<()> {
+    
     let handle = std::thread::spawn(move || {
         let conn = Connector::<P,M,Log>::new(addr).unwrap();
         for i in 0..n {
+            /*-- used to test error handling --*/
+            if sd && i == n-1 {
+                let mut msg = Message::new();
+                msg.set_type(MessageType::SHUTDOWN);
+                conn.post_message(msg);
+                return;
+            }
+            /*---------------------------------*/
             let mut msg = Message::new();
             let s = format!("msg #{} from {}", i, name);
             msg.set_body_str(&s);
@@ -45,6 +56,7 @@ fn start_client(addr: &'static str, name: &'static str, n:usize) -> std::thread:
     });
     handle
 }
+
 fn main() {
 
     print!("\n  -- test2: rust_comm --\n");
@@ -57,9 +69,9 @@ fn main() {
     }
     let handle = rslt.unwrap();
 
-    let h1 = start_client(addr, "bugs ", 5);
-    let h2 = start_client(addr, "elmer", 5);
-    let h3 = start_client(addr, "daffy", 5);
+    let h1 = start_client(addr, "bugs ", 5, false);
+    let h2 = start_client(addr, "elmer", 5, false);
+    let h3 = start_client(addr, "daffy", 5, false);
     
     let _ = h1.join();
     let _ = h2.join();

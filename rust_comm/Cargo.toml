@@ -12,3 +12,4 @@ rust_message = { path = "../rust_message" }
 rust_blocking_queue = { path = "../rust_blocking_queue" }
 rust_comm_processing = { path = "../rust_comm_processing" }
 rust_comm_logger = { path = "../rust_comm_logger" }
+rust_timer = { path = "../rust_timer" }

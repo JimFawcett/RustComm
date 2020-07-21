@@ -30,7 +30,7 @@ use rust_comm_logger::*;
 /*-- std library facilities --*/
 use std::fmt::*;
 use std::sync::{Arc, atomic::AtomicBool, atomic::Ordering};
-use std::net::{TcpStream, TcpListener};
+use std::net::{TcpStream, TcpListener, Shutdown};
 use std::io::{Result, BufReader, BufWriter, stdout, Write};
 use std::io::prelude::*;
 use std::thread;
@@ -52,6 +52,7 @@ pub struct Connector<P,M,L> where
     rcv_queue: Arc<BlockingQueue<M>>,
      _p: P,
      connected: bool,
+    //  shutdown : bool,
      log: L,
 }
 impl<P,M,L> Connector<P,M,L> where
@@ -71,6 +72,9 @@ impl<P,M,L> Connector<P,M,L> where
     pub fn has_msg(&self) -> bool {
         self.rcv_queue.len() > 0
     }
+    // pub fn shut_down(&self) {
+    //     self.shutdown = true;
+    // }
     pub fn new(addr: &'static str) -> std::io::Result<Connector<P,M,L>>
     where
         M: Msg + Debug + Clone + Send + Default + 'static,
@@ -87,7 +91,7 @@ impl<P,M,L> Connector<P,M,L> where
             _is_connected = true;
             L::write(&format!("\n--connected to {:?}--", addr));
         }
-        let _ = stdout().flush();
+        // let _ = stdout().flush();
         let stream = rslt.unwrap();
         let mut buf_writer = BufWriter::new(stream.try_clone()?);
         let mut buf_reader = BufReader::new(stream);
@@ -104,7 +108,10 @@ impl<P,M,L> Connector<P,M,L> where
                 let msg = ssq.de_q();
                 //print!("\n  sending msg");
                 let msg_type = msg.get_type();
-                let _ = P::buf_send_message(msg, &mut buf_writer);
+                let rslt = P::buf_send_message(msg, &mut buf_writer);
+                if rslt.is_err() {
+                    break;
+                }
                 if msg_type == MessageType::END {
                     L::write("\n--terminating connector send thread--");
                     break;
@@ -130,6 +137,7 @@ impl<P,M,L> Connector<P,M,L> where
             snd_queue: send_queue,
             rcv_queue: recv_queue,
             connected: _is_connected,
+            // shutdown: false,
             log: L::default(),
         };
         Ok(me)
@@ -191,18 +199,32 @@ where
                 let mut buf_reader = BufReader::new(strm.try_clone().unwrap());
                 let _ = std::thread::spawn(move || {
                     loop {
-                        let _ = P::buf_recv_message(&mut buf_reader, &sq);
+                        let rslt = P::buf_recv_message(&mut buf_reader, &sq);
+                        if rslt.is_err() {
+                            print!("\n  socket session closed abruptly");
+                            break;
+                        }
                         let msg = sq.de_q();
                         if msg.get_type() == MessageType::END {
                             L::write("\n--listener received END message--");
                             L::write("\n--terminating client handler loop--");           
                             break;
                         }
-                        if msg.get_type() == MessageType::QUIT {
+                        else if msg.get_type() == MessageType::QUIT {
                             srun.store(false, Ordering::Relaxed);
                             L::write("\n--listener received QUIT message--");
-                            L::write("\n--terminating listener accept loop--");           
+                            L::write("\n--terminating listener accept loop--");
+                            /*---------------------------------------------
+                               connect so accept returns, making false value of 
+                               run visible
+                            */       
                             let _rslt = TcpStream::connect(addr);
+                            break;
+                        }
+                        /*-- used to test error handling --*/
+                        else if msg.get_type() == MessageType::SHUTDOWN {
+                            let _ = strm.shutdown(Shutdown::Both);
+                            print!("\n  shutting down socket session");
                             break;
                         }
                         let msg = P::process_message(msg);
