@@ -10,12 +10,14 @@
      the Message class
 */
 
+#![allow(unused_imports)]
 #![allow(dead_code)]
 
 /*-- RustComm facilities --*/
 use rust_traits::*;
 use rust_message::*;
 use rust_blocking_queue::*;
+use rust_comm_logger::*;
 
 /*-- std library facilities --*/
 use std::fmt::*;
@@ -152,11 +154,11 @@ mod tests {
     #[test]
     fn construction() {
         let msg = Message::new();
-        let _cp = CommProcessing::<Message>::default();
+        let _cp = CommProcessing::<MuteLog>::default();
         let addr = "127.0.0.1:8080";
         let _lstnr = std::net::TcpListener::bind(addr);
         let mut stream = std::net::TcpStream::connect(addr).unwrap();
-        let _ = CommProcessing::send_message(msg, &mut stream);
+        let _ = CommProcessing::<MuteLog>::send_message(msg, &mut stream);
         assert_eq!(2 + 2, 4);
     }
 }
