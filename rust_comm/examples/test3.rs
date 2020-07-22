@@ -131,17 +131,12 @@ fn main() {
     }
     let handle = rslt.unwrap();
 
-//    let mut tmr = StopWatch::new();
-
-    let h1 = client_wait_for_reply::<L>(addr, "test3 - wait for reply", 1000, 65536);
+    let h1 = client_wait_for_reply::<L>(addr, "test3 - wait for reply", 1000, 0);
     let _ = h1.join();
     println!();
 
-//    tmr.start();
-    let h2 = client_no_wait_for_reply::<L>(addr, "test3 - no wait for reply", 1000, 65536);
+    let h2 = client_no_wait_for_reply::<L>(addr, "test3 - no wait for reply", 1000, 0);
     let _ = h2.join();
-//    let _ = tmr.stop();
-    // print!("\n  elapsed microseconds: {:?}",tmr.elapsed_micros());
 
     /*-- shut down listener --*/
     let conn = Connector::<P,M,Log>::new(addr).unwrap();
