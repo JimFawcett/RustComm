@@ -5,11 +5,12 @@
 /////////////////////////////////////////////////////////////
 /*
    Demo:
+   Test message rate and throughput
    - start Listener component
    - start Connector component
    - start post_message thread
    - start recv_message thread
-   - send a few messages
+   - send a fixed number of messages
    - send END message to exit client handler
    - eval elapsed time
    - send QUIT message to shut down Listener
@@ -70,23 +71,40 @@ fn client_wait_for_reply<L: Logger>(
                 )
             );
         }
+        let _ = tmr.stop();
+        let et = tmr.elapsed_micros();
         let mut msg = Message::new();
         msg.set_type(MessageType::END);
         conn.post_message(msg);
-        let _ = tmr.stop();
-        print!(
-            "\n     elapsed microseconds: {:?}",
-            tmr.elapsed_micros()
-        );
+        display_test_data(et, num_msgs, sz_bytes);
     });
     handle
 }
+fn display_test_data(et:u128, num_msgs:usize, msg_size:usize) {
+    let elapsed_time_sec = 1.0e-6 * et as f64;
+    let num_msgs_f64 = num_msgs as f64;
+    let size_mb = 1.0e-6*(msg_size + 1) as f64;
+    let msg_rate = num_msgs_f64/elapsed_time_sec;
+    let byte_rate_mbpsec = num_msgs_f64*size_mb/elapsed_time_sec;
+    print!("\n      elapsed microsec {}", et);
+    print!("\n      messages/second  {:.2}", msg_rate);
+    print!("\n      thruput - MB/S   {:.2}", byte_rate_mbpsec);
+}
 
+/*---------------------------------------------------------
+  Perf test - client does not wait for reply before posting
+*/
 fn client_no_wait_for_reply<L: Logger>(
-    addr: &'static str, name: &'static str, num_msgs:usize, sz_bytes:usize
+    addr: &'static str,     // endpoint: Ipaddr:Port
+    name: &'static str,     // test name
+    num_msgs:usize,         // number of messages
+    sz_bytes:usize          // message body size
 ) -> std::thread::JoinHandle<()> 
 {
-    print!("\n  -- {}: {} msgs, {} bytes per msg ", name, num_msgs, sz_bytes + 1);
+    print!(
+        "\n  -- {}: {} msgs, {} bytes per msg ", 
+        name, num_msgs, sz_bytes + 1
+    );
     let conn = Arc::new(Connector::<P,M,Log>::new(addr).unwrap());
     let sconn1 = Arc::clone(&conn);
     let sconn2 = Arc::clone(&conn);
@@ -95,10 +113,15 @@ fn client_no_wait_for_reply<L: Logger>(
     msg.set_body_bytes(body);
     let mut tmr = StopWatch::new();
     let _handle = std::thread::spawn(move || {
-        /*-- start timer after connect, building message & starting thread --*/
+        /*-- start timer after connect, bld msg & start thread --*/
         tmr.start();
         for _i in 0..num_msgs {
-            L::write(&format!("\n  posting msg   {:?} of size:  {:?}", name, sz_bytes));
+            L::write(
+                &format!(
+                    "\n  posting msg   {:?} of size:  {:?}", 
+                    name, sz_bytes
+                )
+            );
             sconn1.post_message(msg.clone());
         }
         let mut msg = Message::new();
@@ -108,15 +131,24 @@ fn client_no_wait_for_reply<L: Logger>(
     let handle = std::thread::spawn(move || {
         for _i in 0..num_msgs {
             let msg = sconn2.get_message();
-            L::write(&format!("\n  received msg: {:?}", &msg.type_display()));
+            L::write(
+                &format!(
+                    "\n  received msg: {:?}", 
+                    &msg.type_display()
+                )
+            );
         }
         /*-- stop timer after receiving last message --*/
         let _ = tmr.stop();
-        print!("\n     elapsed microseconds: {:?}",tmr.elapsed_micros());
+        let et = tmr.elapsed_micros();
+        display_test_data(et, num_msgs, sz_bytes);
     });
   handle
 }
 
+/*---------------------------------------------------------
+  Perf testing - runs tests of the day
+*/
 fn main() {
 
     type L = MuteLog;
@@ -131,18 +163,49 @@ fn main() {
     }
     let handle = rslt.unwrap();
 
-    let h1 = client_wait_for_reply::<L>(addr, "test3 - wait for reply", 1000, 0);
+    let h1 = client_wait_for_reply::<L>(
+        addr, "test3 - wait for reply", 1000, 65536
+    );
     let _ = h1.join();
     println!();
 
-    let h2 = client_no_wait_for_reply::<L>(addr, "test3 - no wait for reply", 1000, 0);
+    let h2 = client_no_wait_for_reply::<L>(
+        addr, "test3 - no wait for reply", 1000, 65536
+    );
     let _ = h2.join();
+    println!();
+
+    let h1 = client_wait_for_reply::<L>(
+        addr, "test3 - wait for reply", 1000, 1024
+    );
+    let _ = h1.join();
+    println!();
+
+    let h2 = client_no_wait_for_reply::<L>(
+        addr, "test3 - no wait for reply", 1000, 1024
+    );
+    let _ = h2.join();
+    println!();
+
+    let h1 = client_wait_for_reply::<L>(
+        addr, "test3 - wait for reply", 1000, 0
+    );
+    let _ = h1.join();
+    println!();
+
+    let h2 = client_no_wait_for_reply::<L>(
+        addr, "test3 - no wait for reply", 1000, 0
+    );
+    let _ = h2.join();
+    println!();
 
     /*-- shut down listener --*/
     let conn = Connector::<P,M,Log>::new(addr).unwrap();
     let mut msg = Message::new();
     msg.set_type(MessageType::QUIT);
-    L::write(&format!("\n  main posting  {:?} msg", "QUIT"));
+    L::write(
+        &format!("\n  main posting  {:?} msg", "QUIT")
+    );
     conn.post_message(msg);
     let _ = std::io::stdout().flush();
 
