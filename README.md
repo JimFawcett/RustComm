@@ -1,4 +1,8 @@
 # RustComm
+
+Note:  
+This repository contains a prototype for RustCommWithThreadPool and RustCommExperiments.  It will be removed soon.
+
 Prototype for message-passing communication system
 Provides:
 - Connector&lt;P,M,L&gt;
