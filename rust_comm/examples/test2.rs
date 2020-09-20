@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////
-// rust_comm::test2.rs - Test Tcp Communation Library      //
-//                                                         //
+// rust_comm::test2.rs - Test Tcp Communication Library    //
+//   - RustComm_VariableSizeMsg                            //
 // Jim Fawcett, https://JimFawcett.github.io, 19 Jul 2020  //
 /////////////////////////////////////////////////////////////
 /*
@@ -33,25 +33,28 @@ fn start_client(
     
     let handle = std::thread::spawn(move || {
         let conn = Connector::<P,M,Log>::new(addr).unwrap();
+        print!("\n  connection succeeded");
         for i in 0..n {
             /*-- used to test error handling --*/
             if sd && i == n-1 {
-                let mut msg = Message::new();
-                msg.set_type(MessageType::SHUTDOWN);
+                let mut msg = Message::new(TYPE_SIZE + CONTENT_SIZE);
+                msg.set_type(MessageType::QUIT as u8);
                 conn.post_message(msg);
                 return;
             }
             /*---------------------------------*/
-            let mut msg = Message::new();
             let s = format!("msg #{} from {}", i, name);
-            msg.set_body_str(&s);
+            let mut msg = Message::create_msg_str_fit(&s);
+            msg.set_type(MessageType::FLUSH as u8);
             print!("\n  posting msg:  {:?}", s);
+            Log::write(&format!("\n  message size: {:?}", msg.len()));
             conn.post_message(msg);
             let msg = conn.get_message();
-            print!("\n  received msg: {:?}", msg.get_body_str());
+            print!("\n  received msg: {:?}", msg.get_content_str().unwrap());
         }
-        let mut msg = Message::new();
-        msg.set_type(MessageType::END);
+        let mut msg = Message::new(TYPE_SIZE + CONTENT_SIZE);
+        msg.set_type(MessageType::END as u8);
+        print!("\n  posting END message");
         conn.post_message(msg);
     });
     handle
@@ -59,12 +62,13 @@ fn start_client(
 
 fn main() {
 
-    print!("\n  -- test2: rust_comm --\n");
+    print!("\n  -- test2: rust_comm\n  -- variable size msgs, buffered\n");
     
     let addr = "127.0.0.1:8080";
-    let mut lsnr = Listener::<P,Log>::new();
+    let mut lsnr = Listener::<P,Log>::new(8);
     let rslt = lsnr.start(addr);
     if rslt.is_err() {
+        print!("\n  can't start listener on {:?}", addr);
         return;
     }
     let handle = rslt.unwrap();
@@ -78,13 +82,7 @@ fn main() {
     let _ = h3.join();
 
     /*-- shut down listener --*/
-    let conn = Connector::<P,M,Log>::new(addr).unwrap();
-    let mut msg = Message::new();
-    msg.set_type(MessageType::QUIT);
-    print!("\n  main posting {:?} msg", "QUIT");
-    conn.post_message(msg);
-    let _ = std::io::stdout().flush();
-
+    lsnr.stop();
     let _ = handle.join();
     println!();
 }

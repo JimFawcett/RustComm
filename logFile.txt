@@ -1,0 +1,23 @@
+
+                                      CodeAnalysis - Version 1.4
+    ==============================================================================================
+     Sat Aug 22 12:31:43 2020
+     Path: "C:\github\JimFawcett\RustCommWithThreadPool"
+     Args: *.h, *.cpp, *.cs, /v, /m, /r, /f
+                                                                               
+           Code Metrics - Start Line, Size (lines/code), and Complexity (number of scopes)
+    ==============================================================================================
+
+                 file name        type                               name    line    size    cplx
+    -----------------------  ----------  ---------------------------------  ------  ------  ------
+                             namespace                   Global Namespace       1       1       1
+
+                          Functions Exceeding Metric Limits and Public Data
+    ==============================================================================================
+                 file name        type                               name    line    size    cplx
+    -----------------------  ----------  ---------------------------------  ------  ------  ------
+
+
+
+    searched   337 dirs
+   processed     0 files

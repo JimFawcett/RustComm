@@ -16,7 +16,7 @@
 /*-- RustComm facilities --*/
 use rust_traits::*;
 use rust_message::*;
-use rust_blocking_queue::*;
+//use rust_blocking_queue::*;
 use rust_comm_logger::*;
 
 /*-- std library facilities --*/
@@ -24,6 +24,7 @@ use std::fmt::*;
 use std::net::{TcpStream};
 use std::io::prelude::*;
 use std::io::{BufReader, BufWriter, Write};
+use std::convert::{TryInto};
 
 type M = Message;
 
@@ -49,83 +50,74 @@ where L: Logger + Debug + Copy + Clone + Default
 }
 impl<M,L> Sndr<M> for CommProcessing<L>
 where 
-    M: Msg + std::fmt::Debug + Clone + Send + Default,
+    M: Msg + Clone + Send + Default,
     L: Logger + Debug + Copy + Clone + Default
 {
-    fn send_message(msg: M, stream: &mut TcpStream) -> std::io::Result<()>
+    fn send_message(msg: &M, stream: &mut TcpStream) -> std::io::Result<()>
     {
-        let typebyte = msg.get_type();
-        let buf = [typebyte];
-        stream.write(&buf)?;
-        let bdysz = msg.get_body_size();
-        /*-- to_be_bytes() converts integral type to big-endian byte array --*/
-        stream.write(&bdysz.to_be_bytes())?;
-        stream.write(&msg.get_body_bytes())?;
-        let _ = stream.flush();
+        L::write(&format!("\n  msg.len(): {}", msg.len()));
+        stream.write(&msg.get_ref())?;
         Ok(())
     }
-    fn buf_send_message(msg: M, stream: &mut BufWriter<TcpStream>) -> std::io::Result<()>
+    fn buf_send_message(msg: &M, stream: &mut BufWriter<TcpStream>) -> std::io::Result<()>
     {
-        let typebyte = msg.get_type();
-        let buf = [typebyte];
-        stream.write(&buf)?;
-        let bdysz = msg.get_body_size();
-        /*-- to_be_bytes() converts integral type to big-endian byte array --*/
-        stream.write(&bdysz.to_be_bytes())?;
-        stream.write(&msg.get_body_bytes())?;
-        let _ = stream.flush();
+        L::write(&format!("\n  msg.len(): {}", msg.len()));
+        stream.write(&msg.get_ref())?;
+        let msg_type = msg.get_type(); 
+        if msg_type == MessageType::FLUSH as u8 
+            || msg_type == MessageType::END as u8 
+            || msg_type == MessageType::QUIT as u8 
+        {
+            L::write("\n  flushing stream");
+            let _ = stream.flush();
+        }
         Ok(())
     }
 }
 impl<M,L> Rcvr<M> for CommProcessing<L>
 where 
-    M: Msg + std::fmt::Debug + Clone + Send + Default,
+    M: Msg + Clone + Send + Default,
     L: Logger + Debug + Copy + Clone + Default
 {
     /*-- reads message and enques in supplied BlockingQueue<M> --*/
-    fn recv_message(
-        stream: &mut TcpStream, q:&BlockingQueue<M>
-    ) -> std::io::Result<()> 
+    fn recv_message(stream: &mut TcpStream) -> std::io::Result<M> 
     {
-        let mut msg = M::default();
-        /*-- get MessageType --*/
-        let buf = &mut [0u8; 1];
+        L::write("\n  attempting to receive msg in commProc");
+        let buf = &mut [0u8; HEADER_SIZE];
         stream.read_exact(buf)?;
         let msgtype = buf[0];
-        msg.set_type(msgtype);
-        /*-- get body size --*/
-        let mut buf = [0u8; 8];
-        stream.read_exact(&mut buf)?;
-        let bdysz = usize::from_be_bytes(buf);
-        /*-- get body bytes --*/
+        let sz_slice = &buf[1..HEADER_SIZE];
+        let mut dst = [0u8;8];
+        dst.clone_from_slice(sz_slice); // array from byte slice
+        let bdysz = usize::from_be_bytes(dst);   // usize from byte array
+
         let mut bdy = vec![0u8;bdysz];
-        stream.read_exact(&mut bdy)?;
-        msg.set_body_bytes(bdy);
-        q.en_q(msg);
-        Ok(())
+        stream.read_exact(&mut bdy)?;        
+        let msg_size = TYPE_SIZE + CONTENT_SIZE + bdysz;
+        let mut msg = M::new(msg_size);
+        msg.set_type(msgtype);
+        msg.set_content_bytes(&bdy);
+        Ok(msg)
     }
     /*-- same as above but uses buffered reader --*/
-    fn buf_recv_message(
-        stream: &mut BufReader<TcpStream>, 
-        q: &BlockingQueue<M>
-    ) -> std::io::Result<()> 
+    fn buf_recv_message(stream: &mut BufReader<TcpStream>) -> std::io::Result<M> 
     {
-        let mut msg = M::default();
-        /*-- get MessageType --*/
-        let buf = &mut [0u8; 1];
+        L::write("\n  attempting to receive msg in commProc");
+        let buf = &mut [0u8; HEADER_SIZE];
         stream.read_exact(buf)?;
         let msgtype = buf[0];
-        msg.set_type(msgtype);
-        /*-- get body size --*/
-        let mut buf = [0u8; 8];
-        stream.read_exact(&mut buf)?;
-        let bdysz = usize::from_be_bytes(buf);
-        /*-- get body bytes --*/
+        let sz_slice = &buf[1..HEADER_SIZE];
+        let mut dst = [0u8;8];
+        dst.clone_from_slice(sz_slice); // array from byte slice
+        let bdysz = usize::from_be_bytes(dst);   // usize from byte array
+
         let mut bdy = vec![0u8;bdysz];
-        stream.read_exact(&mut bdy)?;
-        msg.set_body_bytes(bdy);
-        q.en_q(msg);
-        Ok(())
+        stream.read_exact(&mut bdy)?;        
+        let msg_size = TYPE_SIZE + CONTENT_SIZE + bdysz;
+        let mut msg = M::new(msg_size);
+        msg.set_type(msgtype);
+        msg.set_content_bytes(&bdy);
+        Ok(msg)
     }
 }
 /*---------------------------------------------------------
@@ -134,18 +126,19 @@ where
 */
 impl<M,L> Process<M> for CommProcessing<L>
 where 
-    M: Msg + std::fmt::Debug + Clone + Send + Default,
+    M: Msg + Clone + Send + Default,
     L: Logger + Debug + Copy + Clone + Default
 {
-    fn process_message(m: M) -> M 
+    fn process_message(msg: &mut M) 
     {
         L::write("\n--entered process_message--");
-        let mut msg = M::default();
-        msg.set_type(MessageType::REPLY);
-        let mut s = m.get_body_str();
-        s.push_str(" reply");
-        msg.set_body_str(&s);
-        msg
+        let msg_type = msg.get_type();
+        if msg_type != MessageType::FLUSH as u8 
+            && msg_type != MessageType::END as u8 
+            && msg_type != MessageType::QUIT as u8 
+        {
+            msg.set_type(MessageType::REPLY as u8);
+        }
     }
 }
 #[cfg(test)]
@@ -153,12 +146,12 @@ mod tests {
     use super::*;
     #[test]
     fn construction() {
-        let msg = Message::new();
+        let msg = Message::new(64);
         let _cp = CommProcessing::<MuteLog>::default();
         let addr = "127.0.0.1:8080";
         let _lstnr = std::net::TcpListener::bind(addr);
         let mut stream = std::net::TcpStream::connect(addr).unwrap();
-        let _ = CommProcessing::<MuteLog>::send_message(msg, &mut stream);
+        let _ = CommProcessing::<MuteLog>::send_message(&msg, &mut stream);
         assert_eq!(2 + 2, 4);
     }
 }

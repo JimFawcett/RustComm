@@ -15,44 +15,57 @@
 
 use std::net::{TcpStream};
 use std::io::{BufReader, BufWriter, Result};
-use rust_blocking_queue::*;
+use std::str::Utf8Error;
+// use rust_blocking_queue::*;
+
+// pub const MSG_SIZE:usize = 4096;
 
 pub trait Logger : Send {
     fn write(msg: &str);
 }
-pub trait MsgType : Send {
+
+pub trait MsgType : Send + std::fmt::Debug {
     fn get_type(&self) -> u8;
     fn set_type(&mut self, mt:u8);
 }
-pub trait Msg : Send {
-    // fn new() -> &'static dyn Msg where Self: Sized;
-    fn get_type(&self) -> u8;
+
+pub trait Msg : Send + std::fmt::Debug {
+    fn new(sz:usize) -> Self;
+    fn init(&mut self);
+    fn len(&self) -> usize;
+    fn is_empty(&self) -> bool;
     fn set_type(&mut self, mt:u8);
-    fn set_body_bytes(&mut self, b:Vec<u8>);
-    fn set_body_str(&mut self, s: &str);
-    fn get_body_size(&self) -> usize;
-    fn get_body_bytes(&self) -> &Vec<u8>;
-    fn get_body_str(&self) -> String;
-    fn clear(&mut self);
+    fn get_type(&self) -> u8;
+    fn set_content_bytes(&mut self, buff: &[u8]);
+    fn get_content_bytes(&self) -> &[u8];
+    fn set_content_str(&mut self, s: &str);
+    fn get_content_str(&self) -> std::result::Result<&str, Utf8Error>;
+    fn show_message(&self, fold:usize);
+    fn set_content_size(&mut self, sz:usize);
+    fn get_content_size(&self) -> usize;
+    fn set_bytes(&mut self, buff:&[u8]);
+    fn get_bytes(&self) -> &[u8];
+    fn get_mut_bytes(&mut self) -> &mut [u8];
+    fn get_ref(&self) -> &Vec<u8>;
+    fn get_mut_ref(&mut self) -> &mut Vec<u8>;
     fn type_display(&self) -> String;
-    fn show_msg(&self);
 }
 pub trait Sndr<M> : Send 
-where M: Msg + std::fmt::Debug + Clone + Send + Default,
+where M: Msg + Clone + Send + Default,
 {
-    fn send_message(msg: M, stream: &mut TcpStream) -> Result<()>;
-    fn buf_send_message(msg: M, stream: &mut BufWriter<TcpStream>) -> Result<()>;
+    fn send_message(msg: &M, stream: &mut TcpStream) -> Result<()>;
+    fn buf_send_message(msg: &M, stream: &mut BufWriter<TcpStream>) -> Result<()>;
 }
 pub trait Rcvr<M>: Send 
-where M: Msg + std::fmt::Debug + Clone + Send + Default,
+where M: Msg + Clone + Send + Default,
 {
-    fn recv_message(stream: &mut TcpStream, q:&BlockingQueue<M>) -> Result<()>;
-    fn buf_recv_message(stream: &mut BufReader<TcpStream>, q:&BlockingQueue<M>) -> Result<()>;
+    fn recv_message(stream: &mut TcpStream) -> Result<M>;
+    fn buf_recv_message(stream: &mut BufReader<TcpStream>) -> Result<M>;
 }
 pub trait Process<M> : Send 
-where M: Msg + std::fmt::Debug + Clone + Send + Default,
+where M: Msg + Clone + Send + Default,
 {
-    fn process_message(m: M) -> M;
+    fn process_message(m: &mut M);
 }
 #[cfg(test)]
 mod tests {

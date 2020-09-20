@@ -13,3 +13,5 @@ rust_blocking_queue = { path = "../rust_blocking_queue" }
 rust_comm_processing = { path = "../rust_comm_processing" }
 rust_comm_logger = { path = "../rust_comm_logger" }
 rust_timer = { path = "../rust_timer" }
+rust_thread_pool = { path = "../rust_thread_pool" }
+rust_debug = { path = "../rust_debug" }
