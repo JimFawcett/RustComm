@@ -28,7 +28,6 @@ use rust_message::*;
 use rust_comm_processing::*;
 use rust_blocking_queue::*;
 use rust_comm_logger::*;
-use rust_thread_pool::*;
 
 /*-- std library facilities --*/
 use std::fmt::*;
@@ -223,9 +222,7 @@ L: Logger + Debug + Copy + Clone + Default
     p: P,
     run: Arc<AtomicBool>,  // used to terminate Listener
     log: L, 
-    num_thrds: u8,
     addr: &'static str,
-    // msg_size: usize,
     /*-- ThreadPool instance is aggregated in self.start() --*/
 }
 impl<P,L> Listener<P,L> 
@@ -233,22 +230,14 @@ where
     P: Debug + Copy + Clone + Send + Sync + Default + Sndr<M> + Rcvr<M> + Process<M> + 'static,
     L: Logger + Debug + Copy + Clone + Default
     {    
-    pub fn new(nt: u8) -> Listener<P,L> {
+    pub fn new() -> Listener<P,L> {
         Listener {
               p: P::default(),
               run: Arc::new(AtomicBool::new(true)),
               log: L::default(),
-              num_thrds: nt,
               addr: "",
-            //   msg_size: 64,
         }
     }
-    // pub fn set_msg_size(&mut self, msg_size:usize) {
-    //     self.msg_size = msg_size;
-    // }
-    // pub fn get_msg_size(&self) -> usize {
-    //     self.msg_size
-    // }
     /*-- starts thread wrapping incoming loop which often blocks --*/
     pub fn start(&mut self, addr: &'static str) -> Result<JoinHandle<()>> 
     {
@@ -260,25 +249,26 @@ where
             return Err(std::io::Error::new(std::io::ErrorKind::Other, "listener bind failed"));
         }
         let tcpl = rslt.unwrap();
-        let nt = self.num_thrds;
         let run_ref = Arc::clone(&self.run);
 
         /*-- this outer thread prevents appl from blocking waiting for connections --*/
         let handle = std::thread::spawn(move || {
-            let mut tp = ThreadPool::<TcpStream>::new(nt, thread_proc);
             /*-- loop on incoming iterator which calls accept and so blocks --*/
             for stream in tcpl.incoming() {
                 if !run_ref.load(Ordering::Relaxed) {
                     break;
                 }
                 if stream.is_ok() {
-                    tp.post(stream.unwrap());
+                    let rslt = handle_client(stream.unwrap());
+                    if rslt.is_err() {
+                        continue;
+                    }
                 }
                 else {
                     continue;
                 }
             }
-            tp.stop();
+            // tp.stop();
             L::write("\n--terminating listener thread--");  
         });
         Ok(handle)

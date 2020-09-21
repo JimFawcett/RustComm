@@ -196,10 +196,8 @@ fn main() {
 
     type L = MuteLog;
     
-    let nt: u8 = 8;
     let addr = "127.0.0.1:8080";
-    print!("\n  num thrdpool thrds: {:?}",nt);
-    let mut lsnr = Listener::<P,Log>::new(nt);
+    let mut lsnr = Listener::<P,Log>::new();
     let rslt = lsnr.start(addr);
     if rslt.is_err() {
         return;

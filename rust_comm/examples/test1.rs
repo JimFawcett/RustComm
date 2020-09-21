@@ -34,7 +34,7 @@ fn main() {
     print!("\n  -- test1: rust_comm\n  -- variable size msgs, buffered\n");
     
     let addr = "127.0.0.1:8080";
-    let mut lsnr = Listener::<P,Log>::new(8);
+    let mut lsnr = Listener::<P,Log>::new();
     let rslt = lsnr.start(addr);
     if rslt.is_err() {
         return;
