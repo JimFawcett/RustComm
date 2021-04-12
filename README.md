@@ -2,7 +2,7 @@
 
 This repository contains a Prototype for message-passing communication system  
 
-<img src="https://JimFawcett.github.io/Pictures/RustCommConcept.jpg " width="400" />
+<img src="https://JimFawcett.github.io/Pictures/RustCommConcept.jpg" width="400" />
 
 RustComm Provides types:
 - Connector&lt;P,M,L&gt;
