@@ -47,8 +47,7 @@ provide **RustCommWithThreadPool** repository.
 There are three user-defined types: Message, Connector, and Listener. Connector and Listener each use an existing component BlockingQueue<Message>.
 
 **Message Methods:** 
-```rust
-  - new() -> Message
+```rust  - new() -> Message
       Create new Message with empty body and MessageType::TEXT.  
       
   - set_type(&mut self, mt: u8)
