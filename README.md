@@ -1,6 +1,6 @@
 # RustComm
 
-See https://JimFawcett.github.io/RustComm.html for details.
+https://JimFawcett.github.io/RustComm.html
 
 ### Concept:  
 RustComm is a facility for sending messages between a Sender and Receiver. It uses the std::net::TcpStream and std::net::TcpListener types.  
@@ -8,7 +8,7 @@ RustComm is a facility for sending messages between a Sender and Receiver. It us
 ### Figure 1. - RustComm Structure
 <img src="https://JimFawcett.github.io/Pictures/RustCommConcept.jpg" width="600" />
 
-This is a prototype for message-passing communication systems. It provides types: Connector, Listener, CommProcessing, and Message, with generic parameters M, P, and L, as shown in Fig. 1.  
+This is a prototype for message-passing communication systems. It provides types: Connector, Listener, CommProcessing, and Message, with generic parameters M, P, and L, as shown in Fig. 1.  CommProcessing is used internally by both Connector and Listener.
   - M implements the Msg trait and represents a message to be sent between endpoints. 
   - P implements the Process<M> trait that defines message processing.
   - L implements the Logger trait that supports logging events to the console that can be turned on or off by the types supplied for L, e.g., VerboseLog and MuteLog.
