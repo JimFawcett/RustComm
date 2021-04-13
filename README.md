@@ -8,15 +8,7 @@ RustComm is a facility for sending messages between a Sender and Receiver. It us
 ### Figure 1. - RustComm Structure
 <img src="https://JimFawcett.github.io/Pictures/RustCommConcept.jpg" width="600" />
 
-RustComm Provides types:
-- Connector&lt;P,M,L&gt;
-- Listener&lt;P,L&gt;
-- M is a generic parameter implemented with **Message**
-- P is a generic parameter implemented with **CommProcessing&lt;L&gt;**
-
-All application specific processing is in CommProcessing&lt;L&gt;.
-
-This is a prototype for message-passing communication system. It provides three user defined types: Connector, Listener, and Message, with generic parameters M, P, and L, as shown in Fig. 1.  
+This is a prototype for message-passing communication systems. It provides types: Connector, Listener, CommProcessing, and Message, with generic parameters M, P, and L, as shown in Fig. 1.  
   - M implements the Msg trait and represents a message to be sent between endpoints. 
   - P implements the Process<M> trait that defines message processing.
   - L implements the Logger trait that supports logging events to the console that can be turned on or off by the types supplied for L, e.g., VerboseLog and MuteLog.
@@ -27,7 +19,8 @@ The RustComm library:
   - For each Connector<P, M, L> connection, Listener<P, L> processes messages until receiving a message with MessageType::END. Listener<P, L>
     spawns a thread for each client connection and processes messages in P::process_message.
   
-In this version, P::process_message echos back message with "reply" appended as reply to sender. You observe that behavior in Fig. 2.
+In this version, P::process_message echos back message with "reply" appended as reply to sender. CommProcessing supports open-ended processing capabilities
+as needed for applications.
 
 ### Goal:
 The long-term goal for RustComm is to serve as a prototyping platform for various messaging and processing strategies. This version defines traits: Sndr<M>, Rcvr<M>, Process<M>, Msg, and Logger.  
