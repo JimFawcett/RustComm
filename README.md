@@ -93,15 +93,15 @@ Both Connector<P, M, L> and Listener<P, L> are parameterized with L, a type sati
       
   - has_message(&self) -> bool
       Returns true if reply message is available. 
-      
-### Listener<P, L> methods:
+```     
+**Listener<P, L> methods:**
 ```rust
   - new() -> Listener<P, L>
       Create new Listener<P, L>.  
       
   - start(&mut self, addr: &'static str) -> std::io::Result<JoinHandle<()>>
       Bind Listener<P,L> to addr and start listening on dedicated thread.  
-
+```
 ### Operation:
 This is intended to be a simple test-bed for ideas - easy to use and with very little setup and configuration.
 
@@ -109,13 +109,4 @@ This is intended to be a simple test-bed for ideas - easy to use and with very l
 Download and, in a command prompt, cargo build or cargo run.  
 
 ### Status:
-Expected Changes and Additions:
-
-    Define traits Msg, Sndr, Rcvr, and Process. Refactor package code into Connector<C> and Listener<P>, where C and P implement the traits. The intent is to allow designers to create application specific processing, providing Listeners send and receive methods that are tailored to an application's messages and processing, that simply plug into the RustComm framework.
-     Add reply messages to this demo. 
-    Add  Sender queue  and a threadpool in Receiver
-    Add file transfer capability
-     Convert to buffered reads and writes 
-    Add user-defined Comm type that composes a Sender and a Receiver.
-    Support interhangeably Messages that use references to external facilities for defining message body contents rather than packing into message.
-
+Expect to add file transfer capability.
