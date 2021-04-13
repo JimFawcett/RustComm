@@ -46,7 +46,7 @@ provide **RustCommWithThreadPool** repository.
 
 There are three user-defined types: Message, Connector, and Listener. Connector and Listener each use an existing component BlockingQueue<Message>.
 
-### Methods:
+#### Message Methods:
 ```rust
   - new() -> Message
       Create new Message with empty body and MessageType::TEXT.  
@@ -76,25 +76,31 @@ There are three user-defined types: Message, Connector, and Listener. Connector 
       clear body contents.
 
 Both Connector<P, M, L> and Listener<P, L> are parameterized with L, a type satisfying a Logger trait. The package defines two types that implement the trait, VerboseLog and MuteLog that allow users to easily turn on and off event display outputs. Fig 2. uses MuteLog in both Connector<P, M, L> and Listener<P, L>.
-Connector<P, M, L> methods:
-```rust
-    new(addr: &'static str) -> std::io::Result<Connector<P,M,L>>
-    Create new Connector<P,M,L> with running send and receive threads.
-    is_connected(&self) -> bool
-    is connected to addr?.
-    post_message(&self, msg: M)
-    Enqueues msg to send to connected Receiver.
-    get_message(&mut self) -> M
-    Reads reply message if available, else blocks.
-    has_message(&self) -> bool
-    Returns true if reply message is available.
 
-Listener<P, L> methods:
+### Connector<P, M, L> methods:
 ```rust
-    new() -> Listener<P, L>
-    Create new Listener<P, L>.
-    start(&mut self, addr: &'static str) -> std::io::Result<JoinHandle<()>>
-    Bind Listener<P,L> to addr and start listening on dedicated thread.  
+  - new(addr: &'static str) -> std::io::Result<Connector<P,M,L>>
+      Create new Connector<P,M,L> with running send and receive threads.  
+      
+  - is_connected(&self) -> bool
+      is connected to addr?.  
+      
+  - post_message(&self, msg: M)
+      Enqueues msg to send to connected Receiver. 
+      
+  - get_message(&mut self) -> M
+      Reads reply message if available, else blocks.  
+      
+  - has_message(&self) -> bool
+      Returns true if reply message is available. 
+      
+### Listener<P, L> methods:
+```rust
+  - new() -> Listener<P, L>
+      Create new Listener<P, L>.  
+      
+  - start(&mut self, addr: &'static str) -> std::io::Result<JoinHandle<()>>
+      Bind Listener<P,L> to addr and start listening on dedicated thread.  
 
 ### Operation:
 This is intended to be a simple test-bed for ideas - easy to use and with very little setup and configuration.
