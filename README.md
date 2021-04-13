@@ -31,14 +31,23 @@ The RustComm library:
   
 In this version, P::process_message echos back message with "reply" appended as reply to sender. You observe that behavior in Fig. 2.
 
-The long-term goal for RustComm is to serve as a prototyping platform for various messaging and processing strategies. This version defines traits: Sndr<M>, Rcvr<M>, Process<M>, Msg, and Logger.
-The user-defined types, M and P, are things that change as we change the message structure, defined by M and connector and listener processing defined by P. These types are defined in the rust_comm_processing crate.
-The somewhat complex handling of TcpStreams and TcpListener are expected to remain fixed. They are defined in the crate rust_comm. Finally, logger L provides a write method that will, using VerboseLog for L, write its argument to the console. MuteLog simply discards its argument.
-The last step in this phase of development is to add a threadpool, as shown in Fig. 1. The threadpool exists and has been lightly tested. What remains is to integrate it into the Listener component.
-Current Design:
-There are three user-defined types: Message, Connector, and Listener. Connector and Listener each use an existing component BlockingQueue<Message>
-Message: Methods:
+### Goal:
+The long-term goal for RustComm is to serve as a prototyping platform for various messaging and processing strategies. This version defines traits: Sndr<M>, Rcvr<M>, Process<M>, Msg, and Logger.  
+  
+User-defined types, M and P, are things that change as we change the message structure, defined by M and connector and listener processing defined by P. These types are defined in the rust_comm_processing crate.  
 
+The somewhat complex handling of TcpStreams and TcpListener are expected to remain fixed. They are defined in the crate rust_comm.  
+Finally, logger L provides a write method that will, using VerboseLog for L, write its argument to the console. MuteLog simply discards its argument.  
+
+The last step in this phase of development is to add a threadpool, as shown in Fig. 1. The threadpool exists and has been combined with this code to
+provide **RustCommWithThreadPool** repository.  
+
+### Current Design:  
+
+There are three user-defined types: Message, Connector, and Listener. Connector and Listener each use an existing component BlockingQueue<Message>.
+
+### Methods:
+```rust
     new() -> Message
     Create new Message with empty body and MessageType::TEXT.
     set_type(&mut self, mt: u8)
@@ -60,7 +69,7 @@ Message: Methods:
 
 Both Connector<P, M, L> and Listener<P, L> are parameterized with L, a type satisfying a Logger trait. The package defines two types that implement the trait, VerboseLog and MuteLog that allow users to easily turn on and off event display outputs. Fig 2. uses MuteLog in both Connector<P, M, L> and Listener<P, L>.
 Connector<P, M, L> methods:
-
+```rust
     new(addr: &'static str) -> std::io::Result<Connector<P,M,L>>
     Create new Connector<P,M,L> with running send and receive threads.
     is_connected(&self) -> bool
@@ -73,17 +82,19 @@ Connector<P, M, L> methods:
     Returns true if reply message is available.
 
 Listener<P, L> methods:
-
+```rust
     new() -> Listener<P, L>
     Create new Listener<P, L>.
     start(&mut self, addr: &'static str) -> std::io::Result<JoinHandle<()>>
-    Bind Listener<P,L> to addr and start listening on dedicated thread.
+    Bind Listener<P,L> to addr and start listening on dedicated thread.  
 
-Operation:
+### Operation:
 This is intended to be a simple test-bed for ideas - easy to use and with very little setup and configuration.
-Build:
-Download and, in a command prompt, cargo build or cargo run.
-Status:
+
+### Build:
+Download and, in a command prompt, cargo build or cargo run.  
+
+### Status:
 Expected Changes and Additions:
 
     Define traits Msg, Sndr, Rcvr, and Process. Refactor package code into Connector<C> and Listener<P>, where C and P implement the traits. The intent is to allow designers to create application specific processing, providing Listeners send and receive methods that are tailored to an application's messages and processing, that simply plug into the RustComm framework.
