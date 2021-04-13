@@ -46,7 +46,8 @@ provide **RustCommWithThreadPool** repository.
 
 There are three user-defined types: Message, Connector, and Listener. Connector and Listener each use an existing component BlockingQueue<Message>.
 
-#### Message Methods: ```rust
+**Message Methods:** 
+```rust
   - new() -> Message
       Create new Message with empty body and MessageType::TEXT.  
       
@@ -73,10 +74,10 @@ There are three user-defined types: Message, Connector, and Listener. Connector 
       
   - clear(&self)
       clear body contents.
-
+```
 Both Connector<P, M, L> and Listener<P, L> are parameterized with L, a type satisfying a Logger trait. The package defines two types that implement the trait, VerboseLog and MuteLog that allow users to easily turn on and off event display outputs. Fig 2. uses MuteLog in both Connector<P, M, L> and Listener<P, L>.
 
-### Connector<P, M, L> methods:
+**Connector<P, M, L> methods:**
 ```rust
   - new(addr: &'static str) -> std::io::Result<Connector<P,M,L>>
       Create new Connector<P,M,L> with running send and receive threads.  
