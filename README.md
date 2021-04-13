@@ -49,21 +49,29 @@ There are three user-defined types: Message, Connector, and Listener. Connector 
 ### Methods:
 ```rust
   - new() -> Message
-      Create new Message with empty body and MessageType::TEXT.
+      Create new Message with empty body and MessageType::TEXT.  
+      
   - set_type(&mut self, mt: u8)
-      Set MessageType member to one of: TEXT, BYTES, END.
+      Set MessageType member to one of: TEXT, BYTES, END.   
+      
   - get_type(&self) -> MessageType
-      Return MessageType member value.
+      Return MessageType member value.  
+      
   - set_body_bytes(&mut self, b: Vec<u8>)
-      Set body_buffer member to bytes fromb: Vec<u8>.
+      Set body_buffer member to bytes fromb: Vec<u8>.  
+      
   - set_body_str(&mut self, s: &str;)
-      Set body_buffer member to bytes froms: &str.
+      Set body_buffer member to bytes froms: &str.  
+      
   - get_body_size(&self) -> usize
-      Return size in bytes of body member.
+      Return size in bytes of body member.  
+      
   - get_body(&self) -> &Vec<u8>
-      Return body_buffer member.
+      Return body_buffer member.  
+      
   - get_body_str(&self) -> String
-      Return body contents as lossy String.
+      Return body contents as lossy String.  
+      
   - clear(&self)
       clear body contents.
 
